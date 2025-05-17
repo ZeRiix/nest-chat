@@ -1,0 +1,12 @@
+{
+  "name": "nest-chat",
+  "type": "module",
+  "workspaces": [
+    ".npm-packages",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npx concurrently \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\""
+  }
+}

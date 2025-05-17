@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400">
+	<!-- Fond avec un léger gradient -->
+	<defs>
+		<linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#f8f9fa" />
+			<stop offset="100%" stop-color="#e9ecef" />
+		</linearGradient>
+	</defs>
+	<!-- Fond léger -->
+	<rect width="800" height="400" fill="url(#bg-gradient)" rx="20" ry="20" />
+	<!-- Texte "404" principal -->
+	<text x="400" y="200" font-family="Arial, sans-serif" font-size="150" font-weight="bold" text-anchor="middle" fill="#343a40">
+		404
+	</text>
+	<!-- Message d'erreur -->
+	<text x="400" y="260" font-family="Arial, sans-serif" font-size="30" text-anchor="middle" fill="#6c757d">
+		Page non trouvée
+	</text>
+	<!-- Éléments décoratifs -->
+	<circle cx="250" cy="150" r="10" fill="#495057" opacity="0.3" />
+	<circle cx="550" cy="150" r="10" fill="#495057" opacity="0.3" />
+	<circle cx="200" cy="250" r="8" fill="#495057" opacity="0.2" />
+	<circle cx="600" cy="250" r="8" fill="#495057" opacity="0.2" />
+	<circle cx="300" cy="300" r="6" fill="#495057" opacity="0.1" />
+	<circle cx="500" cy="300" r="6" fill="#495057" opacity="0.1" />
+	<!-- Ligne décorative -->
+	<line x1="300" y1="230" x2="500" y2="230" stroke="#6c757d" stroke-width="2" opacity="0.5" />
+</svg>
