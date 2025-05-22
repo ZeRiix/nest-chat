@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test WebSocket</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .chat-area {
+      background-color: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      height: 300px;
+      overflow-y: auto;
+      margin-bottom: 15px;
+      border-radius: 4px;
+    }
+    .message-container {
+      margin-bottom: 10px;
+    }
+    .message {
+      background-color: #e8f4f8;
+      padding: 8px 12px;
+      border-radius: 8px;
+      display: inline-block;
+    }
+    .sender {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 2px;
+    }
+    pre {
+      background: #f0f0f0;
+      padding: 10px;
+      overflow: auto;
+      height: 200px;
+      border-radius: 4px;
+    }
+    button {
+      padding: 8px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    button.secondary {
+      background-color: #f44336;
+    }
+    button.secondary:hover {
+      background-color: #d32f2f;
+    }
+    .status {
+      margin: 10px 0;
+      padding: 8px;
+      border-radius: 4px;
+    }
+    .connected {
+      background-color: #dff0d8;
+      color: #3c763d;
+    }
+    .disconnected {
+      background-color: #f2dede;
+      color: #a94442;
+    }
+    .connecting {
+      background-color: #fcf8e3;
+      color: #8a6d3b;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Test de connexion WebSocket</h2>
+    
+    <!-- Section de connexion -->
+    <div class="form-group">
+      <label for="token">JWT Token</label>
+      <input id="token" placeholder="Entrez votre JWT Token">
+    </div>
+    <div>
+      <button onclick="connect()">Connecter</button>
+      <button class="secondary" onclick="disconnect()">Déconnecter</button>
+      <div id="status" class="status disconnected">Déconnecté</div>
+    </div>
+    
+    <!-- Section de conversation -->
+    <div id="conversationSection" style="display: none; margin-top: 20px;">
+      <h3>Conversation</h3>
+      <div class="form-group">
+        <label for="conversationId">ID de conversation</label>
+        <input id="conversationId" type="number" placeholder="ID de la conversation">
+        <button onclick="joinConversation()">Rejoindre</button>
+        <button onclick="leaveConversation()">Quitter</button>
+      </div>
+      
+      <div class="chat-area" id="messagesContainer"></div>
+      
+      <div class="form-group">
+        <label for="messageInput">Message</label>
+        <textarea id="messageInput" placeholder="Entrez votre message"></textarea>
+      </div>
+      <button onclick="sendMessage()">Envoyer</button>
+    </div>
+    
+    <h3>Logs</h3>
+    <pre id="logs"></pre>
+  </div>
+
+  <script>
+    let socket;
+    let currentConversationId = null;
+    
+    function log(msg) {
+      const logs = document.getElementById('logs');
+      logs.textContent += new Date().toISOString() + ': ' + msg + '\n';
+      logs.scrollTop = logs.scrollHeight;
+    }
+    
+    function connect() {
+      const token = document.getElementById('token').value;
+      if (!token) {
+        alert("Veuillez entrer un token JWT");
+        return;
+      }
+      
+      document.getElementById('status').textContent = 'Tentative de connexion...';
+      document.getElementById('status').className = 'status connecting';
+      
+      // Activer le debug
+      localStorage.debug = '*';
+      
+      try {
+        socket = io('http://localhost:1506/chat', {
+          extraHeaders: {
+            Authorization: `Bearer ${token}`
+          },
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          timeout: 20000
+        });
+        
+        socket.on('connect', () => {
+          log('Connecté avec succès!');
+          document.getElementById('status').textContent = 'Connecté';
+          document.getElementById('status').className = 'status connected';
+          document.getElementById('conversationSection').style.display = 'block';
+        });
+        
+        socket.on('connect_error', (err) => {
+          log('Erreur de connexion: ' + err.message);
+          document.getElementById('status').textContent = 'Erreur: ' + err.message;
+          document.getElementById('status').className = 'status disconnected';
+        });
+        
+        socket.on('disconnect', (reason) => {
+          log('Déconnecté: ' + reason);
+          document.getElementById('status').textContent = 'Déconnecté: ' + reason;
+          document.getElementById('status').className = 'status disconnected';
+          document.getElementById('conversationSection').style.display = 'none';
+        });
+        
+        socket.on('error', (err) => {
+          log('Erreur: ' + JSON.stringify(err));
+        });
+        
+        socket.io.on('error', (err) => {
+          log('Erreur IO: ' + err.message);
+        });
+        
+        // Écouteur pour les messages reçus
+        socket.on('message', (message) => {
+          log('Message reçu: ' + JSON.stringify(message));
+          displayMessage(message);
+        });
+        
+      } catch (err) {
+        log('Exception: ' + err.message);
+        document.getElementById('status').textContent = 'Exception: ' + err.message;
+        document.getElementById('status').className = 'status disconnected';
+      }
+    }
+    
+    function disconnect() {
+      if (socket) {
+        socket.disconnect();
+        log('Déconnexion manuelle');
+        document.getElementById('status').textContent = 'Déconnecté';
+        document.getElementById('status').className = 'status disconnected';
+        document.getElementById('conversationSection').style.display = 'none';
+      }
+    }
+    
+    function joinConversation() {
+      if (!socket || !socket.connected) {
+        alert('Vous devez être connecté pour rejoindre une conversation');
+        return;
+      }
+      
+      const conversationId = document.getElementById('conversationId').value;
+      if (!conversationId) {
+        alert('Veuillez entrer un ID de conversation');
+        return;
+      }
+      
+      socket.emit('joinConversation', parseInt(conversationId));
+      currentConversationId = parseInt(conversationId);
+      log(`Demande de rejoindre la conversation ${conversationId}`);
+      clearMessages();
+    }
+    
+    function leaveConversation() {
+      if (!socket || !socket.connected) {
+        return;
+      }
+      
+      const conversationId = document.getElementById('conversationId').value;
+      if (!conversationId) {
+        return;
+      }
+      
+      socket.emit('leaveConversation', parseInt(conversationId));
+      currentConversationId = null;
+      log(`Demande de quitter la conversation ${conversationId}`);
+      clearMessages();
+    }
+    
+    function sendMessage() {
+      if (!socket || !socket.connected) {
+        alert('Vous devez être connecté pour envoyer un message');
+        return;
+      }
+      
+      if (!currentConversationId) {
+        alert('Vous devez rejoindre une conversation pour envoyer un message');
+        return;
+      }
+      
+      const message = document.getElementById('messageInput').value;
+      if (!message) {
+        alert('Veuillez entrer un message');
+        return;
+      }
+      
+      const payload = {
+        message: message,
+        conversationId: currentConversationId
+      };
+      
+      socket.emit('sendMessage', payload);
+      log(`Message envoyé: ${JSON.stringify(payload)}`);
+      document.getElementById('messageInput').value = '';
+    }
+    
+    function displayMessage(message) {
+      const messagesContainer = document.getElementById('messagesContainer');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message-container';
+      
+      const senderDiv = document.createElement('div');
+      senderDiv.className = 'sender';
+      senderDiv.textContent = `De: ${message.senderEmail || 'Inconnu'} - ${new Date(message.createdAt || Date.now()).toLocaleTimeString()}`;
+      
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'message';
+      contentDiv.textContent = message.content;
+      
+      messageDiv.appendChild(senderDiv);
+      messageDiv.appendChild(contentDiv);
+      messagesContainer.appendChild(messageDiv);
+      
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    function clearMessages() {
+      document.getElementById('messagesContainer').innerHTML = '';
+    }
+  </script>
+</body>
+</html>

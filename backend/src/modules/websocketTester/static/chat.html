@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini WhatsApp - Chat</title>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+        }
+
+		.loading-indicator {
+			text-align: center;
+			padding: 10px;
+			color: #777;
+			font-size: 12px;
+		}
+		
+		@keyframes spin {
+			0% { transform: rotate(0deg); }
+			100% { transform: rotate(360deg); }
+		}
+		
+		.loading-spinner {
+			display: inline-block;
+			width: 15px;
+			height: 15px;
+			border: 2px solid #ddd;
+			border-top: 2px solid #128C7E;
+			border-radius: 50%;
+			animation: spin 1s linear infinite;
+			margin-right: 5px;
+			vertical-align: middle;
+		}
+
+        /* Sidebar des conversations */
+        .sidebar {
+            width: 30%;
+            background-color: white;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            background-color: #128C7E;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .new-conversation {
+            padding: 10px;
+            background-color: #f0f2f5;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .new-conversation button {
+            width: 100%;
+            padding: 8px;
+            background-color: #128C7E;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .conversations-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .conversation-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+        }
+
+        .conversation-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .conversation-item.active {
+            background-color: #e6f7ff;
+            border-left: 3px solid #128C7E;
+        }
+
+        .conversation-title {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .conversation-participants {
+            font-size: 12px;
+            color: #777;
+        }
+
+        /* Zone de chat */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 15px;
+            background-color: white;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-title {
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .chat-actions button {
+            background-color: transparent;
+            border: none;
+            color: #128C7E;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
+
+        .chat-actions button:hover {
+            background-color: #f0f2f5;
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #e5ddd5;
+        }
+
+        .message {
+            margin-bottom: 12px;
+            max-width: 70%;
+        }
+
+        .message-sent {
+            margin-left: auto;
+            background-color: #dcf8c6;
+            border-radius: 10px 0 10px 10px;
+            padding: 8px 12px;
+            align-self: flex-end;
+        }
+
+        .message-received {
+            background-color: white;
+            border-radius: 0 10px 10px 10px;
+            padding: 8px 12px;
+            align-self: flex-start;
+        }
+
+        .message-info {
+            font-size: 11px;
+            color: #777;
+            margin-top: 3px;
+        }
+
+        .message-input-container {
+            display: flex;
+            padding: 10px;
+            background-color: white;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 24px;
+            outline: none;
+        }
+
+        .send-button {
+            background-color: #128C7E;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            margin-left: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Modal pour nouvelle conversation */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 400px;
+            max-width: 80%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #128C7E;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .modal-actions {
+            text-align: right;
+        }
+
+        .modal-actions button {
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .btn-cancel {
+            background-color: #f0f2f5;
+            border: 1px solid #ddd;
+            margin-right: 10px;
+        }
+
+        .btn-create {
+            background-color: #128C7E;
+            color: white;
+            border: none;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #777;
+        }
+
+        .error-message {
+            color: red;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .logout-button {
+            border: none;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar avec la liste des conversations -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>Mini WhatsApp</h1>
+            <button class="logout-button" onclick="logout()">Déconnexion</button>
+        </div>
+        <div class="new-conversation">
+            <button onclick="openNewConversationModal()">Nouvelle conversation</button>
+        </div>
+        <div class="conversations-list" id="conversationsList">
+            <!-- Les conversations seront insérées ici -->
+        </div>
+    </div>
+    
+    <!-- Zone de chat -->
+    <div class="chat-container">
+        <div id="empty-state" class="empty-state">
+            <p>Sélectionnez une conversation pour commencer</p>
+        </div>
+        
+        <div id="chat-area" style="display: none; height: 100%; flex-direction: column;">
+            <div class="chat-header">
+                <h2 class="chat-title" id="chatTitle">Titre de la conversation</h2>
+                <div class="chat-actions">
+                    <button onclick="leaveCurrentConversation()">Quitter</button>
+                </div>
+            </div>
+            <div class="messages-container" id="messagesContainer">
+                <!-- Les messages seront insérés ici -->
+            </div>
+            <div class="message-input-container">
+				<input type="text" class="message-input" id="messageInput" placeholder="Écrire un message..." onkeypress="handleKeyPress(event)">
+				<button type="button" class="send-button" onclick="sendMessage()">→</button>
+			</div>
+        </div>
+    </div>
+    
+    <!-- Modal pour créer une nouvelle conversation -->
+    <div id="newConversationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nouvelle conversation</h2>
+                <span class="close" onclick="closeNewConversationModal()">&times;</span>
+            </div>
+            <div class="form-group">
+                <label for="conversationTitle">Titre</label>
+                <input type="text" id="conversationTitle" placeholder="Titre de la conversation">
+            </div>
+            <div class="form-group">
+                <label for="participantsEmails">Participants (emails séparés par des virgules)</label>
+                <input type="text" id="participantsEmails" placeholder="exemple1@mail.com, exemple2@mail.com">
+            </div>
+            <div id="createConversationError" class="error-message"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeNewConversationModal()">Annuler</button>
+                <button class="btn-create" onclick="createConversation()">Créer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+		window.addEventListener('beforeunload', function(e) {
+			console.log('Page en cours de rechargement');
+			console.log('Dernière action utilisateur:', lastUserAction);
+			e.preventDefault();
+			e.returnValue = '';
+		});
+
+		let lastUserAction = {
+			type: null,
+			time: null,
+			details: null
+		};
+
+		// Fonction pour enregistrer les actions utilisateur
+		function trackUserAction(actionType, actionDetails = {}) {
+			lastUserAction = {
+				type: actionType,
+				time: new Date(),
+				details: actionDetails
+			};
+			console.log(`Action utilisateur: ${actionType}`, actionDetails);
+		}
+
+        // Variables globales
+        let socket;
+        let currentConversationId = null;
+        let userId = null;
+        const token = localStorage.getItem('miniwhatapptoken');
+		let currentPage = 1;
+		let isLoadingMessages = false;
+		let hasMoreMessages = true;
+        const API_URL = 'http://localhost:1506/'; // Ajustez selon votre configuration
+
+		function getUserInfoFromToken() {
+			trackUserAction('getUserInfoFromToken');
+			try {
+				const token = localStorage.getItem('miniwhatapptoken');
+				if (!token) return null;
+				
+				// Récupérer la partie payload du token (2e partie)
+				const base64Url = token.split('.')[1];
+				const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+				const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+					return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+				}).join(''));
+
+				const payload = JSON.parse(jsonPayload);
+				userId = payload.sub || payload.userId || null; // Différents standards possibles
+				
+				console.log('User ID extrait du token:', userId);
+				return payload;
+			} catch (error) {
+				console.error("Erreur lors de l'extraction des informations JWT:", error);
+				return null;
+			}
+		}
+        
+        // Vérifier si l'utilisateur est connecté
+        window.addEventListener('DOMContentLoaded', async () => {
+			trackUserAction('DOMContentLoaded');
+			if (!token) {
+				window.location.href = 'login.html';
+				return;
+			}
+			
+			// Récupérer l'ID utilisateur à partir du token JWT
+			const userInfo = getUserInfoFromToken();
+			if (!userInfo) {
+				console.error("Impossible d'extraire les informations utilisateur du token");
+				logout();
+				return;
+			}
+			
+			try {
+				// Établir la connexion WebSocket
+				setupWebSocket();
+				
+				// Charger la liste des conversations
+				await loadConversations();
+			} catch (error) {
+				console.error("Erreur lors de l'initialisation:", error);
+				if (error.status === 401) {
+					logout();
+				}
+			}
+		});
+
+        // Configurer la connexion WebSocket
+		function setupWebSocket() {
+			trackUserAction('setupWebSocket');
+			try {				
+				socket = io(`${API_URL}chat`, {
+					extraHeaders: {
+						Authorization: `Bearer ${token}`
+					},
+					reconnection: true,
+					debug: true,
+					reconnectionAttempts: 5,
+					reconnectionDelay: 1000,
+					timeout: 20000
+				});
+				
+				socket.on('connect', () => {
+					console.log('WebSocket connecté avec succès!');
+				});
+				
+				socket.on('connect_error', (err) => {
+					console.error('Erreur de connexion WebSocket:', err.message);
+				});
+
+				socket.on('disconnect', (reason) => {
+					console.log('WebSocket déconnecté:', reason);
+				});
+
+				socket.on('error', (err) => {
+					console.error('Erreur socket:', JSON.stringify(err));
+				});
+				
+				socket.io.on('error', (err) => {
+					console.error('Erreur IO:', err.message);
+				});
+
+				socket.on('message', (message) => {
+					console.log('Message reçu:', JSON.stringify(message));
+					if (message.conversationId == currentConversationId) {
+						console.log('Message dans la conversation active, ajout au chat');
+						addMessageToChat(message);
+					}
+					// ne s'exécute pas cransh avan
+					trackUserAction('messageReceived', { messageId: message.id });
+				});
+			} catch (err) {
+				console.error('Exception lors de la configuration WebSocket:', err.message);
+			}
+		}
+
+        // Charger les conversations
+        async function loadConversations() {
+			trackUserAction('loadConversations');
+            try {
+                const response = await fetch(`${API_URL}conversations`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw { status: response.status, message: 'Impossible de récupérer les conversations' };
+                }
+                
+                const conversations = await response.json();
+                displayConversations(conversations);
+            } catch (error) {
+                console.error("Erreur lors du chargement des conversations:", error);
+            }
+        }
+
+		// Afficher les conversations dans la sidebar
+        function displayConversations(conversations) {
+			trackUserAction('displayConversations', { conversationsCount: conversations.length });
+			const listElement = document.getElementById('conversationsList');
+			listElement.innerHTML = '';
+			
+			if (conversations.length === 0) {
+				const emptyElement = document.createElement('div');
+				emptyElement.className = 'conversation-item';
+				emptyElement.textContent = 'Aucune conversation';
+				listElement.appendChild(emptyElement);
+				return;
+			}
+			
+			conversations.forEach(conversation => {
+				const itemElement = document.createElement('div');
+				itemElement.className = 'conversation-item';
+				itemElement.dataset.id = conversation.id;
+				itemElement.onclick = () => selectConversation(conversation);
+				
+				const titleElement = document.createElement('div');
+				titleElement.className = 'conversation-title';
+				titleElement.textContent = conversation.title;
+				
+				const participantsElement = document.createElement('div');
+				participantsElement.className = 'conversation-participants';
+				participantsElement.textContent = 'Chargement des participants...';
+				
+				itemElement.appendChild(titleElement);
+				itemElement.appendChild(participantsElement);
+				listElement.appendChild(itemElement);
+				
+				// Récupérer les participants pour cette conversation
+				fetchParticipants(conversation.id, participantsElement);
+			});
+		}
+
+		// Fonction pour récupérer les participants d'une conversation
+		async function fetchParticipants(conversationId, participantsElement) {
+			trackUserAction('fetchParticipants', { conversationId });
+			try {
+				const response = await fetch(`${API_URL}conversations/${conversationId}/participants`, {
+					method: 'GET',
+					headers: {
+						'Authorization': `Bearer ${token}`,
+						'Content-Type': 'application/json'
+					}
+				});
+				
+				if (!response.ok) {
+					throw new Error('Impossible de récupérer les participants');
+				}
+				
+				const participants = await response.json();
+				
+				// Afficher les emails des participants
+				if (participants && participants.length > 0) {
+					const participantNames = participants.map(p => p.email || 'Inconnu').join(', ');
+					participantsElement.textContent = participantNames;
+				} else {
+					participantsElement.textContent = 'Aucun participant';
+				}
+			} catch (error) {
+				console.error(`Erreur lors de la récupération des participants pour la conversation ${conversationId}:`, error);
+				participantsElement.textContent = 'Erreur de chargement';
+			}
+		}
+
+        // Sélectionner une conversation
+		async function selectConversation(conversation) {
+			trackUserAction('selectConversation', { conversationId: conversation.id });
+			// Quitter la conversation précédente si nécessaire
+			if (currentConversationId) {
+				socket.emit('leaveConversation', parseInt(currentConversationId));
+			}
+			
+			// Mettre à jour l'interface
+			currentConversationId = conversation.id;
+			document.getElementById('chatTitle').textContent = conversation.title;
+			document.getElementById('empty-state').style.display = 'none';
+			document.getElementById('chat-area').style.display = 'flex';
+			document.getElementById('messagesContainer').innerHTML = '';
+			
+			// Mettre à jour la classe active
+			const items = document.querySelectorAll('.conversation-item');
+			items.forEach(item => item.classList.remove('active'));
+			document.querySelector(`.conversation-item[data-id="${conversation.id}"]`).classList.add('active');
+			
+			// Rejoindre la conversation via WebSocket - IMPORTANT: Envoyer l'ID directement comme dans index.html
+			socket.emit('joinConversation', parseInt(conversation.id));
+			console.log(`Demande de rejoindre la conversation ${conversation.id}`);
+			
+			try {
+				// Récupérer la première page de messages
+				await loadMessages(conversation.id, 1);
+				
+				// Configuration du gestionnaire de scroll pour charger plus de messages
+				setupScrollListener(conversation.id);
+			} catch (error) {
+				console.error("Erreur lors du chargement des messages:", error);
+			}
+		}
+
+		async function loadMessages(conversationId, page) {
+			trackUserAction('loadMessages', { conversationId, page });
+			if (isLoadingMessages || !hasMoreMessages) return;
+			
+			try {
+				isLoadingMessages = true;
+				console.log(`Chargement des messages page ${page}...`);
+				
+				// Afficher l'indicateur de chargement si ce n'est pas la première page
+				const messagesContainer = document.getElementById('messagesContainer');
+				let loadingIndicator = null;
+				
+				if (page > 1) {
+					loadingIndicator = document.createElement('div');
+					loadingIndicator.className = 'loading-indicator';
+					loadingIndicator.innerHTML = '<div class="loading-spinner"></div> Chargement des messages...';
+					messagesContainer.insertBefore(loadingIndicator, messagesContainer.firstChild);
+				}
+				
+				// Sauvegarder la hauteur du conteneur et la position avant chargement
+				const initialHeight = messagesContainer.scrollHeight;
+				
+				const response = await fetch(`${API_URL}conversations/${conversationId}/messages?page=${page}`, {
+					method: 'GET',
+					headers: {
+						'Authorization': `Bearer ${token}`,
+						'Content-Type': 'application/json'
+					}
+				});
+				
+				// Supprimer l'indicateur de chargement si présent
+				if (loadingIndicator && loadingIndicator.parentNode === messagesContainer) {
+					loadingIndicator.remove();
+				}
+				
+				if (!response.ok) {
+					throw new Error('Impossible de récupérer les messages');
+				}
+				
+				const messages = await response.json();
+				console.log(`Messages reçus (page ${page}):`, messages.length);
+				
+				// Si aucun message n'est retourné, il n'y a plus de messages à charger
+				if (!messages || messages.length === 0) {
+					hasMoreMessages = false;
+					
+					// Afficher un message indiquant qu'il n'y a plus de messages
+					if (page > 1) {
+						const noMoreMessagesDiv = document.createElement('div');
+						noMoreMessagesDiv.className = 'loading-indicator';
+						noMoreMessagesDiv.textContent = 'Début de la conversation';
+						messagesContainer.insertBefore(noMoreMessagesDiv, messagesContainer.firstChild);
+						
+						// Supprimer ce message après quelques secondes
+						setTimeout(() => {
+							if (noMoreMessagesDiv.parentNode === messagesContainer) {
+								noMoreMessagesDiv.remove();
+							}
+						}, 3000);
+					}
+					
+					return;
+				}
+				
+				// Mettre à jour la page courante
+				currentPage = page;
+				
+				// Trier les messages par date (du plus ancien au plus récent)
+				messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+				
+				if (page === 1) {
+					// Pour la première page, vider le conteneur et ajouter les messages
+					messagesContainer.innerHTML = '';
+					messages.forEach(message => {
+						const messageDiv = createMessageElement(message);
+						messagesContainer.appendChild(messageDiv);
+					});
+					
+					// Scroll vers le bas pour voir les messages les plus récents
+					messagesContainer.scrollTop = messagesContainer.scrollHeight;
+				} else {
+					// Pour les pages > 1, ajouter au début car ce sont des messages plus anciens
+					const fragment = document.createDocumentFragment();
+					messages.forEach(message => {
+						const messageDiv = createMessageElement(message);
+						fragment.appendChild(messageDiv);
+					});
+					
+					// Insérer les nouveaux messages au début
+					messagesContainer.insertBefore(fragment, messagesContainer.firstChild);
+					
+					// Calculer le décalage et ajuster la position de scroll
+					const heightDifference = messagesContainer.scrollHeight - initialHeight;
+					messagesContainer.scrollTop = heightDifference;
+				}
+				
+			} catch (error) {
+				console.error(`Erreur lors du chargement des messages (page ${page}):`, error);
+			} finally {
+				isLoadingMessages = false;
+			}
+		}
+
+        // Envoyer un message
+		function sendMessage() {
+			trackUserAction('sendMessage');
+			// Récupérer le message et vérifier qu'il n'est pas vide
+			const messageInput = document.getElementById('messageInput');
+			const messageText = messageInput.value.trim();
+			
+			// Vérifications de base
+			if (!messageText) {
+				return; // Ne rien faire si le message est vide
+			}
+			
+			// Vérifier que la connexion socket existe et est active
+			if (!socket || !socket.connected) {
+				console.error("WebSocket déconnecté, impossible d'envoyer le message");
+				alert("Connexion perdue. Veuillez rafraîchir la page.");
+				return;
+			}
+			
+			// Vérifier qu'une conversation est sélectionnée
+			if (!currentConversationId) {
+				console.error("Aucune conversation sélectionnée");
+				document.getElementById('empty-state').style.display = 'flex';
+				document.getElementById('chat-area').style.display = 'none';
+				return;
+			}
+			
+			// Utiliser le format exact attendu par le serveur
+			const payload = {
+				message: messageText,
+				conversationId: currentConversationId
+			};
+			
+			// Envoyer via WebSocket
+			socket.emit('sendMessage', payload);
+			console.log("Message envoyé:", payload);
+			
+			// Réinitialiser le champ de saisie
+			messageInput.value = '';
+		}
+
+        // Gestion de la touche Entrée pour envoyer un message
+        function handleKeyPress(event) {
+			trackUserAction('handleKeyPress', { key: event.key });
+			if (event.key === 'Enter' && !event.shiftKey) {
+				event.preventDefault(); // Empêcher le saut de ligne
+				sendMessage();
+			}
+		}
+
+        // Modifier la fonction addMessageToChat pour utiliser createMessageElement
+		function addMessageToChat(message) {
+			trackUserAction('addMessageToChat', { messageId: message.id });
+			// Vérifier que le conteneur de messages existe encore
+			const messagesContainer = document.getElementById('messagesContainer');
+			if (!messagesContainer) {
+				console.error("Erreur: Conteneur de messages non trouvé");
+				return;
+			}
+			
+			const messageDiv = createMessageElement(message);
+			messagesContainer.appendChild(messageDiv);
+			
+			// Scroll vers le dernier message
+			messagesContainer.scrollTop = messagesContainer.scrollHeight;
+			
+			// Vérifier que la zone de chat est toujours visible
+			document.getElementById('empty-state').style.display = 'none';
+			document.getElementById('chat-area').style.display = 'flex';
+			trackUserAction('addMessageToChatEnd', { messageId: message.id });
+		}
+
+        // Ouvrir le modal de nouvelle conversation
+        function openNewConversationModal() {
+			trackUserAction('openNewConversationModal');
+            document.getElementById('newConversationModal').style.display = 'block';
+        }
+
+        // Fermer le modal de nouvelle conversation
+        function closeNewConversationModal() {
+			trackUserAction('closeNewConversationModal');
+            document.getElementById('newConversationModal').style.display = 'none';
+            document.getElementById('conversationTitle').value = '';
+            document.getElementById('participantsEmails').value = '';
+            document.getElementById('createConversationError').style.display = 'none';
+        }
+
+		// Configurer l'écouteur de défilement pour charger plus de messages
+		function setupScrollListener(conversationId) {
+			trackUserAction('setupScrollListener', { conversationId });
+			const messagesContainer = document.getElementById('messagesContainer');
+			
+			// Réinitialiser les variables de pagination
+			currentPage = 1;
+			hasMoreMessages = true;
+			
+			// Créer un bouton permanent pour charger plus de messages
+			const loadMoreButton = document.createElement('button');
+			loadMoreButton.textContent = 'Charger les messages précédents';
+			loadMoreButton.style.width = '100%';
+			loadMoreButton.style.padding = '8px';
+			loadMoreButton.style.background = '#f0f2f5';
+			loadMoreButton.style.border = 'none';
+			loadMoreButton.style.borderBottom = '1px solid #ddd';
+			loadMoreButton.style.cursor = 'pointer';
+			loadMoreButton.id = 'loadMoreButton';
+			
+			// Gestionnaire d'événement pour le bouton
+			loadMoreButton.onclick = function() {
+				if (!isLoadingMessages && hasMoreMessages) {
+					console.log("Chargement manuel des messages plus anciens");
+					loadMoreButton.textContent = 'Chargement...';
+					loadMoreButton.disabled = true;
+					
+					loadMessages(conversationId, currentPage + 1).then(() => {
+						// Supprimer le bouton après le chargement réussi
+						if (loadMoreButton.parentNode === messagesContainer) {
+							messagesContainer.removeChild(document.getElementById('loadMoreButton'));
+						}
+						
+						// Créer un nouveau bouton si on a encore des messages à charger
+						if (hasMoreMessages) {
+							setupLoadMoreButton(messagesContainer, conversationId);
+						}
+					}).catch(() => {
+						// En cas d'erreur, réactiver le bouton
+						loadMoreButton.textContent = 'Charger les messages précédents';
+						loadMoreButton.disabled = false;
+					});
+				}
+			};
+			
+			// Insérer le bouton au début du conteneur
+			messagesContainer.insertBefore(loadMoreButton, messagesContainer.firstChild);
+			
+			// Conserver également l'écouteur de défilement comme solution de secours
+			messagesContainer.onscroll = function() {
+				console.log("Défilement détecté - position:", messagesContainer.scrollTop);
+				
+				if (messagesContainer.scrollTop < 30 && hasMoreMessages && !isLoadingMessages) {
+					console.log("Proche du haut - chargement des messages plus anciens");
+					loadMessages(conversationId, currentPage + 1);
+				}
+			};
+		}
+
+		// Fonction pour créer un nouveau bouton de chargement
+		function setupLoadMoreButton(messagesContainer, conversationId) {
+			trackUserAction('setupLoadMoreButton', { conversationId });
+			const newButton = document.createElement('button');
+			newButton.textContent = 'Charger les messages précédents';
+			newButton.style.width = '100%';
+			newButton.style.padding = '8px';
+			newButton.style.background = '#f0f2f5';
+			newButton.style.border = 'none';
+			newButton.style.borderBottom = '1px solid #ddd';
+			newButton.style.cursor = 'pointer';
+			
+			newButton.onclick = function() {
+				if (!isLoadingMessages && hasMoreMessages) {
+					console.log("Chargement manuel des messages plus anciens");
+					newButton.textContent = 'Chargement...';
+					newButton.disabled = true;
+					
+					loadMessages(conversationId, currentPage + 1).then(() => {
+						// Supprimer le bouton après le chargement réussi
+						if (newButton.parentNode === messagesContainer) {
+							messagesContainer.removeChild(newButton);
+						}
+						
+						// Créer un nouveau bouton si on a encore des messages à charger
+						if (hasMoreMessages) {
+							setupLoadMoreButton(messagesContainer, conversationId);
+						}
+					}).catch(() => {
+						newButton.textContent = 'Charger les messages précédents';
+						newButton.disabled = false;
+					});
+				}
+			};
+			
+			messagesContainer.insertBefore(newButton, messagesContainer.firstChild);
+		}
+
+		// Créer un élément de message (extrait de la fonction addMessageToChat)
+		function createMessageElement(message) {
+			trackUserAction('createMessageElement', { messageId: message.id });
+			const messageDiv = document.createElement('div');
+			
+			// Vérifier les données disponibles
+			console.log('Message à afficher:', message);
+			console.log('User ID actuel:', userId);
+			
+			// Déterminer si c'est un message envoyé ou reçu
+			// Comparer comme strings pour éviter les problèmes de type
+			const isSentMessage = String(message.senderId) === String(userId);
+			
+			console.log('Est un message envoyé ?', isSentMessage);
+			
+			messageDiv.className = `message ${isSentMessage ? 'message-sent' : 'message-received'}`;
+			
+			// Contenu du message
+			const contentDiv = document.createElement('div');
+			contentDiv.textContent = message.content;
+			
+			// Informations du message
+			const infoDiv = document.createElement('div');
+			infoDiv.className = 'message-info';
+			
+			const sender = isSentMessage ? 'Vous' : message.senderEmail || 'Inconnu';
+			const time = message.createdAt ? new Date(message.createdAt).toLocaleTimeString() : new Date().toLocaleTimeString();
+			infoDiv.textContent = `${sender} · ${time}`;
+			
+			messageDiv.appendChild(contentDiv);
+			messageDiv.appendChild(infoDiv)
+			
+			return messageDiv;
+		}
+
+        // Créer une nouvelle conversation
+        async function createConversation() {
+			trackUserAction('createConversation');
+            const title = document.getElementById('conversationTitle').value.trim();
+            const participantsInput = document.getElementById('participantsEmails').value.trim();
+            const errorElement = document.getElementById('createConversationError');
+            
+            if (!title) {
+                errorElement.textContent = 'Veuillez saisir un titre';
+                errorElement.style.display = 'block';
+                return;
+            }
+            
+            // Si des participants sont spécifiés, les traiter
+            let participants = [];
+            if (participantsInput) {
+                participants = participantsInput.split(',').map(email => email.trim());
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}conversations`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title,
+                        participants
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Impossible de créer la conversation');
+                }
+                
+                const newConversation = await response.json();
+                
+                // Fermer le modal
+                closeNewConversationModal();
+                
+                // Recharger les conversations
+                await loadConversations();
+                
+                // Sélectionner la nouvelle conversation
+                selectConversation(newConversation);
+                
+            } catch (error) {
+                console.error("Erreur lors de la création de la conversation:", error);
+                errorElement.textContent = error.message || 'Une erreur est survenue';
+                errorElement.style.display = 'block';
+            }
+        }
+
+        // Quitter la conversation actuelle
+        async function leaveCurrentConversation() {
+			trackUserAction('leaveCurrentConversation');
+            if (!currentConversationId) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}conversations/${currentConversationId}/leave`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Impossible de quitter la conversation');
+                }
+                
+                // Quitter via WebSocket
+                socket.emit('leaveConversation', currentConversationId);
+				console.log(`Demande de quitter la conversation ${currentConversationId}`);
+                
+                // Remettre à zéro l'affichage
+                currentConversationId = null;
+                document.getElementById('empty-state').style.display = 'flex';
+                document.getElementById('chat-area').style.display = 'none';
+                
+                // Recharger les conversations
+                await loadConversations();
+                
+            } catch (error) {
+                console.error("Erreur lors de la sortie de la conversation:", error);
+                alert("Impossible de quitter cette conversation: " + error.message);
+            }
+        }
+
+        // Se déconnecter
+        function logout() {
+			trackUserAction('logout');
+            localStorage.removeItem('miniwhatapptoken');
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
