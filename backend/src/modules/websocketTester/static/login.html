@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini WhatsApp - Connexion</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 400px;
+            padding: 20px;
+            max-width: 90%;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            color: #128C7E;
+            margin-bottom: 10px;
+        }
+        .tab-container {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            flex: 1;
+            text-align: center;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            border-bottom: 2px solid #128C7E;
+            font-weight: bold;
+        }
+        .form-container {
+            margin-top: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #128C7E;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 12px 15px;
+            width: 100%;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0e7369;
+        }
+        .error-message {
+            color: red;
+            margin-top: 10px;
+            text-align: center;
+            display: none;
+        }
+        .success-message {
+            color: green;
+            margin-top: 10px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Mini WhatsApp</h1>
+            <p>Connectez-vous ou inscrivez-vous pour commencer à discuter</p>
+        </div>
+        
+        <div class="tab-container">
+            <div id="login-tab" class="tab active" onclick="switchTab('login')">Connexion</div>
+            <div id="register-tab" class="tab" onclick="switchTab('register')">Inscription</div>
+        </div>
+        
+        <div id="login-form" class="form-container">
+            <div class="form-group">
+                <label for="login-email">Email</label>
+                <input type="email" id="login-email" placeholder="Entrez votre email" required>
+            </div>
+            <div class="form-group">
+                <label for="login-password">Mot de passe</label>
+                <input type="password" id="login-password" placeholder="Entrez votre mot de passe" required>
+            </div>
+            <button id="login-button" type="button">Se connecter</button>
+            <div id="login-error" class="error-message"></div>
+        </div>
+        
+        <div id="register-form" class="form-container" style="display: none;">
+            <div class="form-group">
+                <label for="register-email">Email</label>
+                <input type="email" id="register-email" placeholder="Entrez votre email" required>
+            </div>
+            <div class="form-group">
+                <label for="register-password">Mot de passe</label>
+                <input type="password" id="register-password" placeholder="Choisissez un mot de passe" required>
+            </div>
+            <div class="form-group">
+                <label for="register-username">Pseudo</label>
+                <input type="text" id="register-username" placeholder="Choisissez un pseudo" required>
+            </div>
+            <button id="register-button" type="button">S'inscrire</button>
+            <div id="register-error" class="error-message"></div>
+            <div id="register-success" class="success-message"></div>
+        </div>
+    </div>
+
+    <script>
+        // URL de base de l'API
+        const API_URL = 'http://localhost:1506/'; // Ajustez selon votre configuration
+
+        // Fonction pour changer entre les onglets de connexion et d'inscription
+        function switchTab(tab) {
+            if (tab === 'login') {
+                document.getElementById('login-tab').classList.add('active');
+                document.getElementById('register-tab').classList.remove('active');
+                document.getElementById('login-form').style.display = 'block';
+                document.getElementById('register-form').style.display = 'none';
+            } else {
+                document.getElementById('register-tab').classList.add('active');
+                document.getElementById('login-tab').classList.remove('active');
+                document.getElementById('register-form').style.display = 'block';
+                document.getElementById('login-form').style.display = 'none';
+            }
+        }
+
+        // Gérer la connexion
+        document.getElementById('login-button').addEventListener('click', async () => {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errorElement = document.getElementById('login-error');
+            
+            // Vérifier que les champs sont remplis
+            if (!email || !password) {
+                errorElement.textContent = 'Veuillez remplir tous les champs';
+                errorElement.style.display = 'block';
+                return;
+            }
+
+            try {
+                // Appel à l'API pour se connecter
+                const response = await fetch(`${API_URL}login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Identifiants incorrects');
+                }
+
+                const data = await response.json();
+                
+                // Stocker le token dans le localStorage
+                localStorage.setItem('miniwhatapptoken', data.accessToken);
+                
+                // Rediriger vers la page principale après connexion réussie
+                window.location.href = 'chat.html'; // Créez cette page pour l'interface de chat
+                
+            } catch (error) {
+                errorElement.textContent = error.message || 'Erreur de connexion';
+                errorElement.style.display = 'block';
+            }
+        });
+
+        // Gérer l'inscription
+        document.getElementById('register-button').addEventListener('click', async () => {
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const username = document.getElementById('register-username').value;
+            const errorElement = document.getElementById('register-error');
+            const successElement = document.getElementById('register-success');
+            
+            // Vérifier que tous les champs sont remplis
+            if (!email || !password || !username) {
+                errorElement.textContent = 'Veuillez remplir tous les champs';
+                errorElement.style.display = 'block';
+                successElement.style.display = 'none';
+                return;
+            }
+
+            try {
+                // Appel à l'API pour s'inscrire
+                const response = await fetch(`${API_URL}register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password, username })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Erreur lors de l\'inscription');
+                }
+
+                // Inscription réussie
+                successElement.textContent = 'Inscription réussie ! Vous pouvez maintenant vous connecter.';
+                successElement.style.display = 'block';
+                errorElement.style.display = 'none';
+                
+                // Réinitialiser les champs
+                document.getElementById('register-email').value = '';
+                document.getElementById('register-password').value = '';
+                document.getElementById('register-username').value = '';
+                
+                // Passer à l'onglet de connexion après 2 secondes
+                setTimeout(() => {
+                    switchTab('login');
+                }, 2000);
+                
+            } catch (error) {
+                errorElement.textContent = error.message || 'Erreur lors de l\'inscription';
+                errorElement.style.display = 'block';
+                successElement.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
