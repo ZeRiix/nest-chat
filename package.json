@@ -1,6 +1,9 @@
 {
   "name": "nest-chat",
   "type": "module",
+  "engines": {
+    "node": ">=22.14.0"
+  },
   "workspaces": [
     ".npm-packages",
     "backend",
